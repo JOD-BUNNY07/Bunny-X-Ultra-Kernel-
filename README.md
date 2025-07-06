@@ -9,7 +9,7 @@
 - Improved battery management
 - Enhanced thermal control
 - Fine-tuned CPU/GPU frequency scaling
-- Optional extras: WireGuard, exFAT support *(if applicable)*
+- Optional extras: KernelSU-Next,SUSFS,F2F Compression, WireGuard, exFAT support *(if applicable)*
 - More to come..
 
 ## Supported Device
@@ -24,6 +24,6 @@ Flashable `.img` or `.zip` packages will be provided for each release. Please en
 
 ## Credits
 
-- Realme for the base kernel source
-- Realme 6 Pro Community
+- [Realme 6 Pro for the base kernel source](https://github.com/rm6p/android_kernel_realme_sm7125.git)  
+- [Realme 6 Pro Community](https://t.me/realme6pro)
 - Linux upstream contributors
