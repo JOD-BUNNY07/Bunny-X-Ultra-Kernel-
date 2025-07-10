@@ -14,10 +14,6 @@
 #include <linux/sched.h>
 #endif
 
-#ifdef CONFIG_KSU_SUSFS_SUS_SU
-#include <linux/susfs_def.h>
-#endif
-
 #include "objsec.h"
 #include "allowlist.h"
 #include "arch.h"
@@ -53,52 +49,36 @@ static inline char __user *sh_user_path(void)
 	return userspace_stack_buffer(sh_path, sizeof(sh_path));
 }
 
-static char __user *ksud_user_path(void)
+static inline char __user *ksud_user_path(void)
 {
-	static const char ksud_path[] = KSUD_PATH;
 
 	return userspace_stack_buffer(ksud_path, sizeof(ksud_path));
 }
 
-static int ksu_sucompat_common(const char __user **filename_user, const char *syscall_name,
-                                const bool escalate)
+int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode,
+			 int *__unused_flags)
 {
-        if (unlikely(!filename_user))
-                return 0;
 
 #ifndef CONFIG_KSU_KPROBES_HOOK
-        if (unlikely(!ksu_sucompat_non_kp))
-                return 0;
+	if (!ksu_sucompat_non_kp) {
+		return 0;
+	}
 #endif
 
-        if (!ksu_is_allow_uid(current_uid().val))
-                return 0;
+	if (!ksu_is_allow_uid(current_uid().val)) {
+		return 0;
+	}
 
-        char path[sizeof(su) + 1];
-	if (ksu_copy_from_user_retry(path, *filename_user, sizeof(path)))
-                return 0;
+	char path[sizeof(su) + 1];
+	memset(path, 0, sizeof(path));
+	ksu_strncpy_from_user_nofault(path, *filename_user, sizeof(path));
 
-        path[sizeof(path) - 1] = '\0';
+	if (unlikely(!memcmp(path, su, sizeof(su)))) {
+		pr_info("faccessat su->sh!\n");
+		*filename_user = sh_user_path();
+	}
 
-        if (memcmp(path, su, sizeof(su)))
-                return 0;
-
-        if (escalate) {
-                pr_info("%s su found\n", syscall_name);
-                *filename_user = ksud_user_path();
-                ksu_escape_to_root(); // escalate !!
-        } else {
-                pr_info("%s su->sh!\n", syscall_name);
-                *filename_user = sh_user_path();
-        }
-
-        return 0;
-}
-
-int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode,
-                         int *__unused_flags)
-{
-        return ksu_sucompat_common(filename_user, "faccessat", false);
+	return 0;
 }
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0) && defined(CONFIG_KSU_SUSFS_SUS_SU)
@@ -126,7 +106,46 @@ struct filename* susfs_ksu_handle_stat(int *dfd, const char __user **filename_us
 
 int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags)
 {
-        return ksu_sucompat_common(filename_user, "newfstatat", false);
+
+#ifndef CONFIG_KSU_KPROBES_HOOK
+	if (!ksu_sucompat_non_kp){
+		return 0;
+	}
+#endif
+
+	if (!ksu_is_allow_uid(current_uid().val)) {
+		return 0;
+	}
+
+	if (unlikely(!filename_user)) {
+		return 0;
+	}
+
+	char path[sizeof(su) + 1];
+	memset(path, 0, sizeof(path));
+// Remove this later!! we use syscall hook, so this will never happen!!!!!
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0) && 0
+	// it becomes a `struct filename *` after 5.18
+	// https://elixir.bootlin.com/linux/v5.18/source/fs/stat.c#L216
+	const char sh[] = SH_PATH;
+	struct filename *filename = *((struct filename **)filename_user);
+	if (IS_ERR(filename)) {
+		return 0;
+	}
+	if (likely(memcmp(filename->name, su, sizeof(su))))
+		return 0;
+	pr_info("vfs_statx su->sh!\n");
+	memcpy((void *)filename->name, sh, sizeof(sh));
+#else
+	ksu_strncpy_from_user_nofault(path, *filename_user, sizeof(path));
+
+	if (unlikely(!memcmp(path, su, sizeof(su)))) {
+		pr_info("newfstatat su->sh!\n");
+		*filename_user = sh_user_path();
+	}
+#endif
+
+	return 0;
 }
 
 // the call from execve_handler_pre won't provided correct value for __never_use_argument, use them after fix execve_handler_pre, keeping them for consistence for manually patched code
@@ -136,16 +155,13 @@ int ksu_handle_execveat_sucompat(int *fd, struct filename **filename_ptr,
 {
 	struct filename *filename;
 
-	if (unlikely(!filename_ptr))
-		return 0;
-
 #ifndef CONFIG_KSU_KPROBES_HOOK
 	if (!ksu_sucompat_non_kp) {
 		return 0;
 	}
 #endif
 
-	if (!ksu_is_allow_uid(current_uid().val))
+	if (unlikely(!filename_ptr))
 		return 0;
 
 	filename = *filename_ptr;
@@ -154,6 +170,9 @@ int ksu_handle_execveat_sucompat(int *fd, struct filename **filename_ptr,
 	}
 
 	if (likely(memcmp(filename->name, su, sizeof(su))))
+		return 0;
+
+	if (!ksu_is_allow_uid(current_uid().val))
 		return 0;
 
 	pr_info("do_execveat_common su found\n");
@@ -168,7 +187,48 @@ int ksu_handle_execve_sucompat(int *fd, const char __user **filename_user,
 			       void *__never_use_argv, void *__never_use_envp,
 			       int *__never_use_flags)
 {
-	return ksu_sucompat_common(filename_user, "sys_execve", true);
+	//const char su[] = SU_PATH;
+	char path[sizeof(su) + 1];
+
+#ifndef CONFIG_KSU_KPROBES_HOOK
+	if (!ksu_sucompat_non_kp) {
+		return 0;
+	}
+#endif
+
+	if (unlikely(!filename_user))
+		return 0;
+
+	// nofault variant fails probably due to pagefault_disable
+	// some cpus dont really have that good speculative execution
+	// substitute set_fs, check if pointer is valid
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,0,0)
+	if (!access_ok(VERIFY_READ, *filename_user, sizeof(path)))
+		return 0;
+#else
+	if (!access_ok(*filename_user, sizeof(path)))
+		return 0;
+#endif
+	// success = returns number of bytes and should be less than path
+	long len = strncpy_from_user(path, *filename_user, sizeof(path));
+	if (len <= 0 || len > sizeof(path))
+		return 0;
+
+	// strncpy_from_user_nofault does this too
+	path[sizeof(path) - 1] = '\0';
+
+	if (likely(memcmp(path, su, sizeof(su))))
+		return 0;
+
+	if (!ksu_is_allow_uid(current_uid().val))
+		return 0;
+
+	pr_info("sys_execve su found\n");
+	*filename_user = ksud_user_path();
+
+	ksu_escape_to_root();
+
+	return 0;
 }
 
 int ksu_handle_devpts(struct inode *inode)

@@ -104,7 +104,7 @@ struct user_arg_ptr {
 // since _ksud handler only uses argv and envp for comparisons
 // this can probably work
 // adapted from ksu_handle_execveat_ksud
-static int ksu_handle_bprm_ksud(const char *filename, const char *argv1, const char *envp, size_t envp_len)
+static int ksu_handle_bprm_ksud(const char *filename, const char *argv1, const char *envp_hex)
 {
 	static const char app_process[] = "/system/bin/app_process";
 	static bool first_app_process = true;
@@ -123,7 +123,8 @@ static int ksu_handle_bprm_ksud(const char *filename, const char *argv1, const c
 		return 0;
 
 	// debug! remove me!
-	pr_info("%s: filename: %s argv1: %s envp_len: %zu\n", __func__, filename, argv1, envp_len);
+	pr_info("%s: filaname: %s argv1: %s \n", __func__, filename, argv1);
+	pr_info("%s: envp (hex): %s\n", __func__, envp_hex);
 
 	if (init_second_stage_executed)
 		goto first_app_process;
@@ -151,22 +152,14 @@ static int ksu_handle_bprm_ksud(const char *filename, const char *argv1, const c
 	}
 
 	// /init without argv1/useless-argv1 but usable envp
+	// ksu_bprm_check passed it packed, so for pattern
+	// 494E49545F5345434F4E445F53544147453D31 = INIT_SECOND_STAGE=1
+	// 494E49545F5345434F4E445F53544147453D74727565 = INIT_SECOND_STAGE=true
 	// untested! TODO: test and debug me!
-	if (!init_second_stage_executed && (!memcmp(filename, old_system_init, sizeof(old_system_init) - 1))) {
-
-		// we hunt for "INIT_SECOND_STAGE"
-		const char *envp_n = envp;
-		unsigned int envc = 1;
-		do {
-			if (strstarts(envp_n, "INIT_SECOND_STAGE"))
-				break;
-			envp_n += strlen(envp_n) + 1;
-			envc++;
-		} while (envp_n < envp + envp_len);
-		pr_info("%s: envp[%d]: %s\n", __func__, envc, envp_n);
-
-		if (!strcmp(envp_n, "INIT_SECOND_STAGE=1")
-			|| !strcmp(envp_n, "INIT_SECOND_STAGE=true") ) {
+	if (!init_second_stage_executed && envp_hex
+		&& (!memcmp(filename, old_system_init, sizeof(old_system_init) - 1))) {
+		if (strstr(envp_hex, "494E49545F5345434F4E445F53544147453D31")
+			|| strstr(envp_hex, "494E49545F5345434F4E445F53544147453D74727565") ) {
 			pr_info("%s: /init +envp: INIT_SECOND_STAGE executed\n", __func__);
 			ksu_apply_kernelsu_rules();
 			init_second_stage_executed = true;
@@ -175,14 +168,33 @@ static int ksu_handle_bprm_ksud(const char *filename, const char *argv1, const c
 	}
 
 first_app_process:
-	if (first_app_process && !memcmp(filename, app_process, sizeof(app_process) - 1)) {
+	if (first_app_process && !strcmp(filename, app_process)) {
 		first_app_process = false;
 		pr_info("%s: exec app_process, /data prepared, second_stage: %d\n", __func__, init_second_stage_executed);
-		ksu_on_post_fs_data();
+		ksu_on_post_fs_data(); // actual ksud execution
 		stop_execve_hook();
 	}
 
 	return 0;
+}
+
+// needs some locking, checking with copy_from_user_nofault,
+// theres actually failed / incomplete copies
+static bool is_locked_copy_ok(void *to, const void __user *from, size_t len)
+{
+	DEFINE_SPINLOCK(ksu_usercopy_spinlock);
+	spin_lock(&ksu_usercopy_spinlock);
+	bool ret = !ksu_copy_from_user_nofault(to, from, len);
+	spin_unlock(&ksu_usercopy_spinlock);
+
+	if (likely(ret))
+		return ret;
+
+	// if nofault copy fails, well, atleast we can try again
+	// this happening is very bad though
+	// I'm adding this just for the sake of resilience
+	pr_info("%s: _nofault copy failed !! report this incident\n", __func__);
+	return !copy_from_user(to, from, len);
 }
 
 int ksu_handle_pre_ksud(const char *filename)
@@ -194,7 +206,7 @@ int ksu_handle_pre_ksud(const char *filename)
 	// not /system/bin/init, not /init, not /system/bin/app_process
 	// return 0;
 	if (likely(strcmp(filename, "/system/bin/init") && strcmp(filename, "/init")
-		&& !strstarts(filename, "/system/bin/app_process") ))
+		&& strcmp(filename, "/system/bin/app_process") ))
 		return 0;
 
 	if (!current || !current->mm)
@@ -210,33 +222,30 @@ int ksu_handle_pre_ksud(const char *filename)
 	size_t arg_len = arg_end - arg_start;
 	size_t envp_len = env_end - env_start;
 
-	if (arg_len <= 0 || envp_len <= 0) // this wont make sense, filter it
-		return 0;
+	if (arg_len == 0 || envp_len == 0) // this wont make sense, filter it
+		goto out;
 
 	char *args = kmalloc(arg_len + 1, GFP_ATOMIC);
 	char *envp = kmalloc(envp_len + 1, GFP_ATOMIC);
-	if (!args || !envp)
+	char *envp_hex = kmalloc(envp_len * 2 + 1, GFP_ATOMIC); // x2 since bin2hex
+	if (!args || !envp || !envp_hex)
 		goto out;
 
 	// we cant use strncpy on here, else it will truncate once it sees \0
-	if (ksu_copy_from_user_retry(args, (void __user *)arg_start, arg_len))
+	if (!is_locked_copy_ok(args, (void __user *)arg_start, arg_len))
 		goto out;
 
-	if (ksu_copy_from_user_retry(envp, (void __user *)env_start, envp_len))
+	if (!is_locked_copy_ok(envp, (void __user *)env_start, envp_len))
 		goto out;
 
 	args[arg_len] = '\0';
 
+	// I fail to simplify the loop so, lets just pack it
+	bin2hex(envp_hex, envp, envp_len);
+	envp_hex[envp_len * 2] = '\0';
 
-#ifdef CONFIG_KSU_DEBUG
-	const char *envp_n = envp;
-	unsigned int envc = 1;
-	do {
-		pr_info("%s: envp[%d]: %s\n", __func__, envc, envp_n);
-		envp_n += strlen(envp_n) + 1;
-		envc++;
-	} while (envp_n < envp + envp_len);
-#endif
+	// debug!
+	//pr_info("%s: envp (hex): %s\n", __func__, envp_hex);
 
 	// we only need argv1 !
 	// abuse strlen here since it only gets length up to \0
@@ -246,11 +255,12 @@ int ksu_handle_pre_ksud(const char *filename)
 
 	// pass whole for envp?!!
 	// pr_info("%s: fname: %s argv1: %s \n", __func__, filename, argv1);
-	ksu_handle_bprm_ksud(filename, argv1, envp, envp_len);
+	ksu_handle_bprm_ksud(filename, argv1, envp_hex);
 
 out:
 	kfree(args);
 	kfree(envp);
+	kfree(envp_hex);
 
 	return 0;
 }
@@ -485,11 +495,8 @@ __maybe_unused int ksu_handle_execve_ksud(const char __user *filename_user,
 	if (!filename_user)
 		return 0;
 
-	long len = ksu_strncpy_from_user_nofault(path, filename_user, 32);
-	if (len <= 0)
-		return 0;
-
-	path[sizeof(path) - 1] = '\0';
+	memset(path, 0, sizeof(path));
+	ksu_strncpy_from_user_nofault(path, filename_user, 32);
 
 	// this is because ksu_handle_execveat_ksud calls it filename->name
 	filename_in.name = path;
