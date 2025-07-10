@@ -1,10 +1,13 @@
-# HyperFusionX Kernel
+![ChatGPT Image Jul 10, 2025, 10_16_39 AM](https://github.com/user-attachments/assets/a0e6dac4-79ce-47f3-8c21-6c8975d0d58c)
+# HyperFusionX Kernel - NOVA Version
 
 **HyperFusionX** is a custom Linux kernel for the Realme 6 Pro, based on the official realme kernel. Built with a focus on performance, battery life, and stability, HyperFusionX aims to deliver a refined and efficient kernel experience for enthusiasts and everyday users alike.
 
 ## Features
 
 - Based on official `kernel-realme-sm7125` source
+- Based on Linux 4.14.336
+- Support for android 13 - 15. (Maybe Android 16 in future)
 - Performance optimizations
 - Improved battery management
 - Enhanced thermal control
