@@ -7,7 +7,7 @@
 
 - Based on official `kernel-realme-sm7125` source
 - Based on Linux 4.14.336
-- Support for android 13 - 15. (Maybe Android 16 in future)
+- Support for android 13 - 16.
 - Performance optimizations
 - Improved battery management
 - Enhanced thermal control
@@ -17,11 +17,11 @@
 
 ## Supported Device
 
-- **Realme 6 Pro** (RMX2061)
+- **Realme 6 Pro** (RMX2061 & RMX2063)
 
 ## Download
 
-Prebuilt kernels and release notes can be found in the [Releases](https://sourceforge.net/projects/realme-6-pro/files/HyperFusionX/) .
+Prebuilt kernels and release notes can be found in the [Releases](https://github.com/aminfauzi/HyperFusionX_Kernel/releases) .
 
 Flashable `.img` or `.zip` packages will be provided for each release. Please ensure your device is compatible before flashing.
 
