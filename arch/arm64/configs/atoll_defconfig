@@ -1087,3 +1087,6 @@ CONFIG_DYNAMIC_FSYNC=y
 # Enable WPA3 personal
 # This uses SAE (Simultaneous Authentication of Equals) for key_mgmt
 CONFIG_SAE=y
+
+# EROFS
+CONFIG_EROFS_FS=y
