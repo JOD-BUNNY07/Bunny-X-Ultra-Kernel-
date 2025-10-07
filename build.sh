@@ -18,7 +18,7 @@ TELEGRAM_CHAT_ID="7039210603"
 
 # Paths
 export KERNEL_ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-export CLANG_PATH=~/toolchains/proton-clang
+export CLANG_PATH=~/toolchains/clang
 export GCC_PATH=~/toolchains/gcc-aarch64-linux-gnu-9.3
 export ANYKERNEL_DIR=~/AnyKernel3
 export OUT_DIR=out
