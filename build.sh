@@ -1,5 +1,44 @@
 #!/bin/bash
 
+# ============================================================
+# Pre-build checks for required toolchains and AnyKernel3
+# ============================================================
+
+# Paths
+CLANG_DIR=~/toolchains/clang
+GCC_DIR=~/toolchains/gcc-aarch64-linux-gnu-9.3
+ANYKERNEL_DIR=~/AnyKernel3
+
+# Check Clang
+if [ ! -d "$CLANG_DIR" ]; then
+  echo -e "\n🔍 \033[1;33mClang toolchain not found. Cloning...\033[0m"
+  git clone --depth=1 --branch lineage-20.0 \
+    https://github.com/LineageOS/android_prebuilts_clang_kernel_linux-x86_clang-r416183b.git "$CLANG_DIR"
+else
+  echo -e "\n✅ \033[1;32mClang toolchain already present.\033[0m"
+fi
+
+# Check GCC
+if [ ! -d "$GCC_DIR" ]; then
+  echo -e "\n🔍 \033[1;33mGCC toolchain not found. Cloning...\033[0m"
+  git clone --depth=1 --branch lineage-23.0 \
+    https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-gnu-9.3.git "$GCC_DIR"
+else
+  echo -e "\n✅ \033[1;32mGCC toolchain already present.\033[0m"
+fi
+
+# Check AnyKernel3
+if [ ! -d "$ANYKERNEL_DIR" ]; then
+  echo -e "\n🔍 \033[1;33mAnyKernel3 not found. Cloning...\033[0m"
+  git clone --depth=1 https://github.com/aminfauzi/AnyKernel3.git "$ANYKERNEL_DIR"
+else
+  echo -e "\n✅ \033[1;32mAnyKernel3 folder already present.\033[0m"
+fi
+
+# ============================================================
+# Build Script
+# ============================================================
+
 # Kernel build configuration
 KERNEL_NAME="HyperFusionX"
 DEVICE="RMX2061"
@@ -18,9 +57,9 @@ TELEGRAM_CHAT_ID="7039210603"
 
 # Paths
 export KERNEL_ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-export CLANG_PATH=~/toolchains/clang
-export GCC_PATH=~/toolchains/gcc-aarch64-linux-gnu-9.3
-export ANYKERNEL_DIR=~/AnyKernel3
+export CLANG_PATH=$CLANG_DIR
+export GCC_PATH=$GCC_DIR
+export ANYKERNEL_DIR=$ANYKERNEL_DIR
 export OUT_DIR=out
 
 export PATH=$CLANG_PATH/bin:$GCC_PATH/bin:$PATH
