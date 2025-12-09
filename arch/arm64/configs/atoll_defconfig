@@ -1083,9 +1083,6 @@ CONFIG_SBALANCE_EXCLUDE_CPUS="5,7"
 # Fast Charge USB
 CONFIG_FORCE_FAST_CHARGE=y
 
-# Dynamic FSYNC
-CONFIG_DYNAMIC_FSYNC=y
-
 # Enable WPA3 personal
 # This uses SAE (Simultaneous Authentication of Equals) for key_mgmt
 CONFIG_SAE=y
