@@ -1,6 +1,6 @@
 <p align="center"><img width="400" height="400" alt="HyperFusionX logo" src="https://github.com/user-attachments/assets/6c2f6183-aa3d-4408-a9f4-6e5074c60b43" /></p>
 
-<h1 align="center">HyperFusionX Kernel - NOVA Version</h1>
+<h1 align="center">HyperFusionX Kernel</h1>
 
 > **Power. Efficiency. Control.** Unleash the full potential of your Realme 6 Pro.
 
