@@ -10,7 +10,7 @@
 
 | Category | Highlights |
 | :--- | :--- |
-| **⚙️ Core** | Based on Linux 4.14.336 • Official realme-sm7125 source |
+| **⚙️ Core** | • **NOVA**: Based on Linux 4.14.336 • Official realme-sm7125 source<br>• **ULTRA**: Based on Linux 4.14.356 • Additional upstream patches |
 | **🧬 Compatibility** | Android 13, 14, 15 & 16 (AOSP & ROMs) |
 | **🎯 Performance** | Optimized CPU/GPU scheduling • Reduced overhead • Smoother UI |
 | **🔋 Battery** | Intelligent power management • Aggressive doze modes • Efficient frequency scaling |
@@ -54,6 +54,12 @@ Flashable `.img` or `.zip` packages will be provided for each release. Please en
 - [KernelSU](https://github.com/tiann/KernelSU) developers.
 - [KernelSU-Next](https://github.com/KernelSU-Next/KernelSU-Next) developers.
 - All the contributors and maintainers in the open-source kernel community.
+
+## 💫 Special Thanks
+
+A huge shoutout to these amazing people who made this project better:
+
+- **[@theshaenix](https://github.com/theshaenix)** - For tremendous support, testing, and invaluable feedback.
 
 
 ## 💝 Support the Project
