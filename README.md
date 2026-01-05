@@ -1,4 +1,4 @@
-<p align="center"><img width="400" height="400" alt="HyperFusionX logo" src="https://github.com/user-attachments/assets/6c2f6183-aa3d-4408-a9f4-6e5074c60b43" /></p>
+<p align="center"><img width="1536" height="1024" alt="ChatGPT Image Jan 5, 2026, 12_22_09 PM" src="https://github.com/user-attachments/assets/657241b5-98a9-4259-87b3-16c08a33735d" /></p>
 
 <h1 align="center">HyperFusionX Kernel</h1>
 
