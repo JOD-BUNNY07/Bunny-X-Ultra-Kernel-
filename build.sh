@@ -33,8 +33,8 @@ fi
 # Check AnyKernel3
 if [ ! -d "$ANYKERNEL_DIR" ]; then
   echo -e "\n🔍 \033[1;33mAnyKernel3 not found. Cloning...\033[0m"
-  git clone --depth=1 --branch HyperFusionX-Ultra \
-    https://github.com/aminfauzi/AnyKernel3.git "$ANYKERNEL_DIR"
+  git clone --depth=1 --branch Nitro-X \
+https://github.com/JOD-BUNNY07/AnyKernel3.git "$ANYKERNEL_DIR"
 else
   echo -e "\n✅ \033[1;32mAnyKernel3 folder already present.\033[0m"
 fi
@@ -44,11 +44,11 @@ fi
 # ============================================================
 
 # Kernel build configuration
-KERNEL_NAME="HyperFusionX"
+KERNEL_NAME="NitroX-Zenith"
 DEVICE="RMX2061"
-VARIANT="Ultra"
+VARIANT="KSUN"
 BUILD_TYPE="Stable"
-VERSION_NUMBER="v2.0"
+VERSION_NUMBER="v1.0.0"
 
 DATE=$(date +%Y%m%d)
 TIME=$(date +%H%M)
