@@ -1,15 +1,15 @@
-name: NitroX -Zenith  (KSUN) Kernel Build
+name: NitroX - Zenith (KSUN) Kernel Build
 
 on:
   push:
     branches:
-      - Nitro-X-KSU 
+      - Nitro-X-KSU
   workflow_dispatch:
     inputs:
       branch:
         description: "Branch to build"
         required: true
-        default: "Nitro-X-KSU
+        default: "Nitro-X-KSU"
 
 jobs:
   build:
@@ -19,7 +19,13 @@ jobs:
       - name: 📥 Checkout Source
         uses: actions/checkout@v4
         with:
-           ref: ${{ github.event.inputs.branch }}
+          ref: ${{ github.event.inputs.branch }}
+          fetch-depth: 1
+
+      - name: ⚡ Setup ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          max-size: 2G
 
       - name: 🧰 Install Dependencies
         run: |
@@ -27,22 +33,28 @@ jobs:
           sudo apt install -y \
             git curl zip bc bison flex \
             libssl-dev libelf-dev \
-            ccache build-essential
+            ccache build-essential python3
 
       - name: 🛠 Make Build Script Executable
         run: chmod +x build.sh
 
+      - name: 🕒 Set Build Timestamp
+        run: echo "BUILD_TIME=$(date -u)" >> $GITHUB_ENV
+
       - name: 🚀 Run Kernel Build
         env:
-          KBUILD_BUILD_USER: JOD_Bunny
+          KBUILD_BUILD_USER: JOD_BUNNY
           KBUILD_BUILD_HOST: BUNNY-X
-          KBUILD_BUILD_TIMESTAMP: "{{- now('+%a %b %d %H:%M:%S UTC %Y', timezone='UTC') -}}"
+          KBUILD_BUILD_TIMESTAMP: ${{ env.BUILD_TIME }}
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: ./build.sh
 
       - name: 📦 Upload Build Artifact
+        if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: NitroX-zenith-Kernel
-          path: output/*.zip
+          name: BunnyX-Kernel
+          path: |
+            AnyKernel3/*.zip
+            out/arch/arm64/boot/Image*
