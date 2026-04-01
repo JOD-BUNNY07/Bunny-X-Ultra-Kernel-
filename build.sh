@@ -97,6 +97,15 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
+# =====================[ KBUILD INFO ]====================
+export KBUILD_BUILD_USER="JOD_BUNNY"
+export KBUILD_BUILD_HOST="BUNNY-X"
+export KBUILD_BUILD_TIMESTAMP=$(date +"%a %b %d %H:%M:%S %Z %Y")
+echo -e "\n👷 Build info:"
+echo "User: $KBUILD_BUILD_USER"
+echo "Host: $KBUILD_BUILD_HOST"
+echo "Timestamp: $KBUILD_BUILD_TIMESTAMP"
+
 # =====================[ COMPILING ]=====================
 
 echo -e "\n🚀 \033[1;35mStarting compilation...\033[0m"
