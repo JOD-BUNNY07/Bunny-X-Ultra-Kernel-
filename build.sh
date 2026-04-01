@@ -100,13 +100,16 @@ aarch64-linux-gcc --version | head -n 1
 
 echo -e "\n📱 Target Device: $DEVICE"
 
-# ===================== DEFCONFIG =====================
-echo -e "\n📄 Loading defconfig..."
-make O=$OUT_DIR ARCH=arm64 atoll_defconfig
-if [ $? -ne 0 ]; then
+# =====================[ DEFCONFIG ]====================
+echo -e "\n📄 Setting up defconfig..."
+make O=$OUT_DIR ARCH=arm64 atoll_defconfig || {
     echo -e "\n❌ Defconfig failed. Exiting."
     exit 1
-fi
+}
+
+echo -e "\n🔧 Preparing kernel (olddefconfig + prepare)..."
+make O=$OUT_DIR ARCH=arm64 olddefconfig
+make O=$OUT_DIR ARCH=arm64 prepare
 
 # ===================== COMPILING =====================
 echo -e "\n🚀 Starting compilation..."
