@@ -4,12 +4,16 @@ set -e
 set -o pipefail
 
 # =========================
-# PATHS
+# ROOT
 # =========================
 KERNEL_ROOT=$(pwd)
 
+# =========================
+# TOOLCHAINS
+# =========================
 CLANG_DIR=$HOME/toolchains/clang
-GCC_DIR=$HOME/toolchains/gcc-aarch64-linux-gnu-9.3
+GCC64_DIR=$HOME/toolchains/gcc64
+GCC32_DIR=$HOME/toolchains/gcc32
 ANYKERNEL_DIR=$KERNEL_ROOT/AnyKernel3
 OUT_DIR=$KERNEL_ROOT/out
 
@@ -17,25 +21,28 @@ mkdir -p $HOME/toolchains
 mkdir -p $OUT_DIR
 
 # =========================
-# CLANG
+# CLANG (NO CHANGE)
 # =========================
 if [ ! -d "$CLANG_DIR" ]; then
   echo "🔍 Cloning Clang..."
   git clone --depth=1 --branch lineage-20.0 \
     https://github.com/LineageOS/android_prebuilts_clang_kernel_linux-x86_clang-r416183b.git "$CLANG_DIR"
-else
-  echo "✅ Clang present"
 fi
 
 # =========================
-# GCC
+# GCC64 (FIXED)
 # =========================
-if [ ! -d "$GCC_DIR" ]; then
-  echo "🔍 Cloning GCC..."
-  git clone --depth=1 --branch lineage-23.0 \
-    https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-gnu-9.3.git "$GCC_DIR"
-else
-  echo "✅ GCC present"
+if [ ! -d "$GCC64_DIR" ]; then
+  echo "🔍 Cloning GCC64..."
+  git clone --depth=1 https://github.com/mvaisakh/gcc-arm64.git "$GCC64_DIR"
+fi
+
+# =========================
+# GCC32 (FIXED)
+# =========================
+if [ ! -d "$GCC32_DIR" ]; then
+  echo "🔍 Cloning GCC32..."
+  git clone --depth=1 https://github.com/mvaisakh/gcc-arm.git "$GCC32_DIR"
 fi
 
 # =========================
@@ -48,16 +55,23 @@ if [ ! -d "$ANYKERNEL_DIR" ]; then
 fi
 
 # =========================
-# ENVIRONMENT
+# ENVIRONMENT (CRITICAL FIX)
 # =========================
-export PATH=$CLANG_DIR/bin:$GCC_DIR/bin:$PATH
+export PATH=$CLANG_DIR/bin:$GCC64_DIR/bin:$GCC32_DIR/bin:$PATH
 
 export ARCH=arm64
 export SUBARCH=arm64
 
 export CC=clang
-export CROSS_COMPILE=aarch64-linux-gnu-
+export REAL_CC=clang
+export HOSTCC=clang
+export HOSTCXX=clang++
+
+# 👉 FIXED PREFIX
+export CROSS_COMPILE=$GCC64_DIR/bin/aarch64-elf-
+export CROSS_COMPILE_ARM32=$GCC32_DIR/bin/arm-eabi-
 export CLANG_TRIPLE=aarch64-linux-gnu-
+
 export LD=ld.lld
 
 # =========================
@@ -66,13 +80,11 @@ export LD=ld.lld
 KERNEL_NAME="NitroX-Zenith"
 DEVICE="RMX2061"
 VARIANT="KSUN"
-BUILD_TYPE="Stable"
-VERSION_NUMBER="v1.0.0"
+VERSION="v1.0.0"
 
-DATE=$(date +%Y%m%d)
-TIME=$(date +%H%M)
+DATE=$(date +%Y%m%d-%H%M)
 
-ZIPNAME="${KERNEL_NAME}-${VARIANT}-${DEVICE}-${BUILD_TYPE}-${TIME}-${DATE}-${VERSION_NUMBER}.zip"
+ZIPNAME="${KERNEL_NAME}-${VARIANT}-${DEVICE}-${DATE}-${VERSION}.zip"
 
 # =========================
 # KBUILD INFO
@@ -81,8 +93,7 @@ export KBUILD_BUILD_USER="JOD_BUNNY"
 export KBUILD_BUILD_HOST="BUNNY-X"
 export KBUILD_BUILD_TIMESTAMP="$(date)"
 
-echo "👤 User: $KBUILD_BUILD_USER"
-echo "💻 Host: $KBUILD_BUILD_HOST"
+echo "👤 $KBUILD_BUILD_USER @ $KBUILD_BUILD_HOST"
 
 # =========================
 # CLEAN
@@ -95,9 +106,12 @@ mkdir -p $OUT_DIR
 # DEFCONFIG
 # =========================
 echo "📄 Running defconfig..."
+
 make O=$OUT_DIR ARCH=arm64 atoll_defconfig
 
-# 👉 VERY IMPORTANT FIX (missing ছিল আগে)
+# 👉 STACK PROTECTOR FIX
+scripts/config --file $OUT_DIR/.config --disable CONFIG_CC_STACKPROTECTOR_STRONG || true
+
 make O=$OUT_DIR ARCH=arm64 olddefconfig
 make O=$OUT_DIR ARCH=arm64 prepare
 
@@ -113,6 +127,7 @@ make -j$(nproc) O=$OUT_DIR \
   LLVM_IAS=1 \
   LD=ld.lld \
   CROSS_COMPILE=$CROSS_COMPILE \
+  CROSS_COMPILE_ARM32=$CROSS_COMPILE_ARM32 \
   CLANG_TRIPLE=$CLANG_TRIPLE \
   KCFLAGS="-Wno-error" \
   KBUILD_BUILD_USER=$KBUILD_BUILD_USER \
@@ -140,14 +155,13 @@ strings $IMG | grep JOD_BUNNY || echo "⚠️ KBUILD not applied"
 # =========================
 # PACK ZIP
 # =========================
-echo "📦 Creating zip..."
+echo "📦 Packing..."
 
 cp $IMG $ANYKERNEL_DIR/zImage
 
 cd $ANYKERNEL_DIR
 zip -r9 $ZIPNAME * -x "*.git*" "*.zip" README.md > /dev/null
 
-# 👉 IMPORTANT (artifact fix)
 cp $ZIPNAME $KERNEL_ROOT/
 
 echo "🎉 Zip: $ZIPNAME"
