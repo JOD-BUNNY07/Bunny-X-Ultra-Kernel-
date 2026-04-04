@@ -20,39 +20,33 @@ OUT_DIR=$KERNEL_ROOT/out
 mkdir -p $HOME/toolchains
 mkdir -p $OUT_DIR
 
-# =========================
-# CLANG (NO CHANGE)
-# =========================
+# Check Clang
 if [ ! -d "$CLANG_DIR" ]; then
-  echo "🔍 Cloning Clang..."
+  echo -e "\n🔍 \033[1;33mClang toolchain not found. Cloning...\033[0m"
   git clone --depth=1 --branch lineage-20.0 \
     https://github.com/LineageOS/android_prebuilts_clang_kernel_linux-x86_clang-r416183b.git "$CLANG_DIR"
+else
+  echo -e "\n✅ \033[1;32mClang toolchain already present.\033[0m"
 fi
 
-# =========================
-# GCC64 (FIXED)
-# =========================
-if [ ! -d "$GCC64_DIR" ]; then
-  echo "🔍 Cloning GCC64..."
-  git clone --depth=1 https://github.com/mvaisakh/gcc-arm64.git "$GCC64_DIR"
+# Check GCC
+if [ ! -d "$GCC_DIR" ]; then
+  echo -e "\n🔍 \033[1;33mGCC toolchain not found. Cloning...\033[0m"
+  git clone --depth=1 --branch lineage-23.0 \
+    https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-gnu-9.3.git "$GCC_DIR"
+else
+  echo -e "\n✅ \033[1;32mGCC toolchain already present.\033[0m"
 fi
 
-# =========================
-# GCC32 (FIXED)
-# =========================
-if [ ! -d "$GCC32_DIR" ]; then
-  echo "🔍 Cloning GCC32..."
-  git clone --depth=1 https://github.com/mvaisakh/gcc-arm.git "$GCC32_DIR"
-fi
-
-# =========================
-# ANYKERNEL3
-# =========================
+# Check AnyKernel3
 if [ ! -d "$ANYKERNEL_DIR" ]; then
-  echo "🔍 Cloning AnyKernel3..."
-  git clone --depth=1 -b Nitro-X \
-    https://github.com/JOD-BUNNY07/AnyKernel3.git "$ANYKERNEL_DIR"
+  echo -e "\n🔍 \033[1;33mAnyKernel3 not found. Cloning...\033[0m"
+  git clone --depth=1 --branch Nitro-X \
+https://github.com/JOD-BUNNY07/AnyKernel3.git "$ANYKERNEL_DIR"
+else
+  echo -e "\n✅ \033[1;32mAnyKernel3 folder already present.\033[0m"
 fi
+
 
 # =========================
 # ENVIRONMENT (CRITICAL FIX)
