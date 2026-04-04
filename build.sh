@@ -4,12 +4,16 @@ set -e
 set -o pipefail
 
 # =========================
-# PATH SETUP
+# ROOT PATH
 # =========================
 KERNEL_ROOT=$(pwd)
 
+# =========================
+# TOOLCHAIN PATHS
+# =========================
 CLANG_DIR=$HOME/toolchains/clang
-GCC_DIR=$HOME/toolchains/gcc
+GCC64_DIR=$HOME/toolchains/gcc64
+GCC32_DIR=$HOME/toolchains/gcc32
 ANYKERNEL_DIR=$KERNEL_ROOT/AnyKernel3
 OUT_DIR=$KERNEL_ROOT/out
 
@@ -20,30 +24,58 @@ mkdir -p $OUT_DIR
 # CLANG 17
 # =========================
 if [ ! -d "$CLANG_DIR" ]; then
-    echo "🔍 Clang 17 not found. Cloning..."
+    echo "🔍 Cloning Clang 17..."
     git clone --depth=1 https://github.com/ZyCromerZ/Clang.git "$CLANG_DIR"
 else
-    echo "✅ Clang present"
+    echo "✅ Clang already present"
 fi
 
 # =========================
-# GCC
+# GCC 64
 # =========================
-if [ ! -d "$GCC_DIR" ]; then
-    echo "🔍 GCC not found. Cloning..."
-    git clone --depth=1 https://github.com/mvaisakh/gcc-arm64.git "$GCC_DIR"
+if [ ! -d "$GCC64_DIR" ]; then
+    echo "🔍 Cloning GCC64..."
+    git clone --depth=1 https://github.com/mvaisakh/gcc-arm64.git "$GCC64_DIR"
+fi
+
+# =========================
+# GCC 32 (IMPORTANT)
+# =========================
+if [ ! -d "$GCC32_DIR" ]; then
+    echo "🔍 Cloning GCC32..."
+    git clone --depth=1 https://github.com/mvaisakh/gcc-arm.git "$GCC32_DIR"
 fi
 
 # =========================
 # ANYKERNEL3
 # =========================
 if [ ! -d "$ANYKERNEL_DIR" ]; then
-    echo "🔍 AnyKernel3 not found. Cloning..."
+    echo "🔍 Cloning AnyKernel3..."
     git clone --depth=1 -b Nitro-X https://github.com/JOD-BUNNY07/AnyKernel3.git "$ANYKERNEL_DIR"
 fi
 
 # =========================
-# CUSTOM KERNEL INFO
+# EXPORT PATH (CRITICAL FIX)
+# =========================
+export PATH=$CLANG_DIR/bin:$GCC64_DIR/bin:$GCC32_DIR/bin:$PATH
+
+# Verify clang
+echo "🔧 Using Clang:"
+$CLANG_DIR/bin/clang --version | head -n 1
+
+# =========================
+# ENVIRONMENT
+# =========================
+export ARCH=arm64
+export SUBARCH=arm64
+
+export CC=clang
+export CROSS_COMPILE=aarch64-linux-gnu-
+export CROSS_COMPILE_ARM32=arm-linux-gnueabi-
+export CLANG_TRIPLE=aarch64-linux-gnu-
+
+# =========================
+# KERNEL INFO
 # =========================
 KERNEL_NAME="NitroX-Zenith"
 DEVICE="RMX2061"
@@ -56,23 +88,6 @@ export KBUILD_BUILD_USER="JOD_BUNNY"
 export KBUILD_BUILD_HOST="BUNNY-X"
 export KBUILD_BUILD_TIMESTAMP="$(date)"
 export KBUILD_COMPILER_STRING="$($CLANG_DIR/bin/clang --version | head -n 1)"
-
-# =========================
-# ENVIRONMENT
-# =========================
-export PATH=$CLANG_DIR/bin:$GCC_DIR/bin:$PATH
-
-export ARCH=arm64
-export SUBARCH=arm64
-
-export CROSS_COMPILE=aarch64-linux-gnu-
-export CLANG_TRIPLE=aarch64-linux-gnu-
-
-# =========================
-# INFO
-# =========================
-echo "🔧 Using Clang:"
-clang --version | head -n 1
 
 echo "📱 Device: $DEVICE"
 echo "🧠 Kernel: $KERNEL_NAME ($VARIANT)"
@@ -106,6 +121,7 @@ make -j$(nproc) O=$OUT_DIR \
     LLVM_IAS=1 \
     LD=$CLANG_DIR/bin/ld.lld \
     CROSS_COMPILE=$CROSS_COMPILE \
+    CROSS_COMPILE_ARM32=$CROSS_COMPILE_ARM32 \
     CLANG_TRIPLE=$CLANG_TRIPLE \
     KCFLAGS="-Wno-error" \
     KBUILD_BUILD_USER=$KBUILD_BUILD_USER \
@@ -126,13 +142,13 @@ fi
 echo "✅ Build successful"
 
 # =========================
-# VERIFY
+# VERIFY KBUILD
 # =========================
-echo "🔍 Verifying KBUILD..."
+echo "🔍 Checking KBUILD..."
 strings $IMG | grep JOD_BUNNY || echo "⚠️ KBUILD not applied!"
 
 # =========================
-# PACK
+# PACK ZIP
 # =========================
 echo "📦 Creating zip..."
 
@@ -149,7 +165,7 @@ cp $ZIPNAME $KERNEL_ROOT/
 echo "🎉 Zip created: $ZIPNAME"
 
 # =========================
-# TELEGRAM
+# TELEGRAM UPLOAD
 # =========================
 if [ -n "$TELEGRAM_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ]; then
     echo "📤 Uploading to Telegram..."
