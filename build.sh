@@ -4,12 +4,12 @@ set -e
 set -o pipefail
 
 # =========================
-# ROOT PATH
+# ROOT
 # =========================
 KERNEL_ROOT=$(pwd)
 
 # =========================
-# TOOLCHAIN PATHS
+# PATHS
 # =========================
 CLANG_DIR=$HOME/toolchains/clang
 GCC64_DIR=$HOME/toolchains/gcc64
@@ -21,7 +21,7 @@ mkdir -p $HOME/toolchains
 mkdir -p $OUT_DIR
 
 # =========================
-# CLANG (FIXED)
+# CLANG (FIXED NESTED)
 # =========================
 if [ ! -d "$CLANG_DIR" ]; then
     echo "🔍 Cloning Clang..."
@@ -29,7 +29,7 @@ if [ ! -d "$CLANG_DIR" ]; then
 fi
 
 # =========================
-# GCC 64
+# GCC64
 # =========================
 if [ ! -d "$GCC64_DIR" ]; then
     echo "🔍 Cloning GCC64..."
@@ -37,7 +37,7 @@ if [ ! -d "$GCC64_DIR" ]; then
 fi
 
 # =========================
-# GCC 32
+# GCC32
 # =========================
 if [ ! -d "$GCC32_DIR" ]; then
     echo "🔍 Cloning GCC32..."
@@ -53,20 +53,22 @@ if [ ! -d "$ANYKERNEL_DIR" ]; then
 fi
 
 # =========================
-# FIX CLANG DETECTION
+# FIX CLANG DETECTION (FINAL)
 # =========================
-CLANG_BIN=$(find $CLANG_DIR/bin -name "clang" | head -n 1)
+CLANG_BIN=$(find $CLANG_DIR -type f -name clang | head -n 1)
 
 if [ -z "$CLANG_BIN" ]; then
     echo "❌ Clang not found!"
     exit 1
 fi
 
-# =========================
-# EXPORT ENV
-# =========================
-export PATH=$CLANG_DIR/bin:$GCC64_DIR/bin:$GCC32_DIR/bin:$PATH
+CLANG_PATH=$(dirname $CLANG_BIN)
 
+export PATH=$CLANG_PATH:$GCC64_DIR/bin:$GCC32_DIR/bin:$PATH
+
+# =========================
+# ENV
+# =========================
 export ARCH=arm64
 export SUBARCH=arm64
 
@@ -180,6 +182,7 @@ if [ -n "$TELEGRAM_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ]; then
 📦 $ZIPNAME
 📱 $DEVICE
 ⚙️ $VARIANT
+🧠 $KERNEL_NAME
 🕐 $(date)" \
          https://api.telegram.org/bot$TELEGRAM_TOKEN/sendDocument > /dev/null
 
