@@ -3,173 +3,156 @@
 set -e
 set -o pipefail
 
-# ============================================================
-# Pre-build checks for required toolchains and AnyKernel3
-# ============================================================
+# ================= PATH SETUP =================
 
-# Paths
+export KERNEL_ROOT="$(pwd)"
 CLANG_DIR=$HOME/toolchains/clang
-GCC_DIR=$HOME/toolchains/gcc-aarch64-linux-gnu-9.3
+GCC_DIR=$HOME/toolchains/gcc
 ANYKERNEL_DIR=$KERNEL_ROOT/AnyKernel3
-OUT_DIR=$HOME/out
+OUT_DIR=$KERNEL_ROOT/out
 
 mkdir -p $HOME/toolchains
 mkdir -p $OUT_DIR
 
-# Check Clang
+# ================= TOOLCHAINS =================
+
+# Clang 17 (r498229)
 if [ ! -d "$CLANG_DIR" ]; then
-    echo -e "\n🔍 \033[1;33mClang toolchain not found. Cloning...\033[0m"
-    git clone --depth=1 --branch lineage-20.0 \
-      https://github.com/LineageOS/android_prebuilts_clang_kernel_linux-x86_clang-r416183b.git "$CLANG_DIR"
+    echo "🔍 Clang 17 not found. Cloning..."
+    git clone --depth=1 https://github.com/ZyCromerZ/Clang.git "$CLANG_DIR"
 else
-    echo -e "\n✅ \033[1;32mClang toolchain already present.\033[0m"
+    echo "✅ Clang already present"
 fi
 
-# Check GCC
+# GCC 9.3
 if [ ! -d "$GCC_DIR" ]; then
-    echo -e "\n🔍 \033[1;33mGCC toolchain not found. Cloning...\033[0m"
-    git clone --depth=1 --branch lineage-23.0 \
-      https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-gnu-9.3.git "$GCC_DIR"
+    echo "🔍 GCC not found. Cloning..."
+    git clone --depth=1 \
+    https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-gnu-9.3.git \
+    "$GCC_DIR"
 else
-    echo -e "\n✅ \033[1;32mGCC toolchain already present.\033[0m"
+    echo "✅ GCC already present"
 fi
 
-# Check AnyKernel3
+# AnyKernel3
 if [ ! -d "$ANYKERNEL_DIR" ]; then
-    echo -e "\n🔍 \033[1;33mAnyKernel3 not found. Cloning...\033[0m"
+    echo "🔍 AnyKernel3 not found. Cloning..."
     git clone --depth=1 --branch Nitro-X \
-      https://github.com/JOD-BUNNY07/AnyKernel3.git "$ANYKERNEL_DIR"
+    https://github.com/JOD-BUNNY07/AnyKernel3.git "$ANYKERNEL_DIR"
 else
-    echo -e "\n✅ \033[1;32mAnyKernel3 folder already present.\033[0m"
+    echo "✅ AnyKernel3 already present"
 fi
 
-# ============================================================
-# Kernel Build Config
-# ============================================================
+# ================= BUILD CONFIG =================
 
 KERNEL_NAME="NitroX-Zenith"
 DEVICE="RMX2061"
 VARIANT="KSUN"
-BUILD_TYPE="Stable"
-VERSION_NUMBER="v1.0.0"
 
-DATE=$(date +%Y%m%d)
-TIME=$(date +%H%M)
-BASE_ZIPNAME="${KERNEL_NAME}-${VARIANT}-${DEVICE}-${BUILD_TYPE}-${TIME}-${DATE}-${VERSION_NUMBER}"
-ZIPNAME="${BASE_ZIPNAME}.zip"
+DATE=$(date +%Y%m%d-%H%M)
+ZIPNAME="${KERNEL_NAME}-${VARIANT}-${DEVICE}-${DATE}.zip"
 
-# Telegram
-: "${TELEGRAM_TOKEN:?Need TELEGRAM_TOKEN environment variable}"
-: "${TELEGRAM_CHAT_ID:?Need TELEGRAM_CHAT_ID environment variable}"
+# ================= ENV =================
 
-# ============================================================
-# Export Environment
-# ============================================================
-
-export KERNEL_ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-export CLANG_PATH=$CLANG_DIR
-export GCC_PATH=$GCC_DIR
-export ANYKERNEL_DIR=$ANYKERNEL_DIR
-export OUT_DIR=$OUT_DIR
-
-export PATH=$CLANG_PATH/bin:$GCC_PATH/bin:$PATH
+export PATH=$CLANG_DIR/bin:$GCC_DIR/bin:$PATH
 export ARCH=arm64
 export CLANG_TRIPLE=aarch64-linux-gnu-
 export CROSS_COMPILE=aarch64-linux-
 
 export KBUILD_BUILD_USER="JOD_BUNNY"
 export KBUILD_BUILD_HOST="BUNNY-X"
-export BUILD_TIME=$(date '+%a %b %d %H:%M:%S IST %Y')
-export KBUILD_BUILD_TIMESTAMP="$BUILD_TIME"
+export KBUILD_BUILD_TIMESTAMP="$(date)"
 
-# ============================================================
-# Start Build
-# ============================================================
+# ================= CLEAN =================
 
-BUILD_START=$(date +%s)
-echo -e "\n🛠️  Starting Kernel Build: $BASE_ZIPNAME"
+echo "🧹 Cleaning..."
+rm -rf $OUT_DIR
+mkdir -p $OUT_DIR
+ccache -C || true
 
-echo -e "\n🧹 Cleaning output and ccache..."
-make O=$OUT_DIR mrproper
-rm -f "$ANYKERNEL_DIR/zImage"
-ccache -C > /dev/null 2>&1
+# ================= INFO =================
 
-echo -e "\n🔧 Compiler Info:"
+echo "🔧 Compiler Info:"
 clang --version | head -n 1
 aarch64-linux-gcc --version | head -n 1
 
-echo -e "\n📱 Target Device: $DEVICE"
+echo "📱 Device: $DEVICE"
 
-# =====================[ DEFCONFIG ]====================
-echo -e "\n📄 Setting up defconfig..."
-make O=$OUT_DIR ARCH=arm64 atoll_defconfig || {
-    echo -e "\n❌ Defconfig failed. Exiting."
-    exit 1
-}
+# ================= DEFCONFIG =================
 
-echo -e "\n🔧 Preparing kernel (olddefconfig + prepare)..."
+echo "⚙️ Running defconfig..."
+make O=$OUT_DIR ARCH=arm64 atoll_defconfig
+
+echo "⚙️ Preparing kernel..."
 make O=$OUT_DIR ARCH=arm64 olddefconfig
 make O=$OUT_DIR ARCH=arm64 prepare
 
-# ===================== COMPILING =====================
-echo -e "\n🚀 Starting compilation..."
-JOBS=$(( $(nproc) - 1 ))
-make -j$JOBS O=$OUT_DIR \
+# ================= BUILD =================
+
+echo "🚀 Building kernel..."
+
+make -j$(nproc) O=$OUT_DIR \
     ARCH=arm64 \
     LLVM=1 \
     LLVM_IAS=1 \
+    LD=ld.lld \
+    KCFLAGS="-Wno-error" \
     CLANG_TRIPLE=$CLANG_TRIPLE \
     CROSS_COMPILE=$CROSS_COMPILE \
-    KBUILD_BUILD_USER="JOD_BUNNY" \
-    KBUILD_BUILD_HOST="BUNNY-X" \
-    KBUILD_BUILD_TIMESTAMP="$BUILD_TIME" \
-    2>&1 | tee $OUT_DIR/full_build.log | grep --line-buffered -E "warning:|error:" | sed \
-    -e 's/warning:/\x1b[1;33mwarning:\x1b[0m/g' \
-    -e 's/error:/\x1b[1;31merror:\x1b[0m/g'
+    KBUILD_BUILD_USER=$KBUILD_BUILD_USER \
+    KBUILD_BUILD_HOST=$KBUILD_BUILD_HOST \
+    KBUILD_BUILD_TIMESTAMP="$KBUILD_BUILD_TIMESTAMP" \
+    2>&1 | tee $OUT_DIR/build.log
 
-# ===================== CHECK IMAGE =====================
-KERNEL_IMG=$OUT_DIR/arch/arm64/boot/Image.gz-dtb
-if [ ! -f "$KERNEL_IMG" ]; then
-    echo -e "\n❌ Build failed: Image.gz-dtb not found!"
-    exit 1
-fi
-echo -e "\n✅ Kernel image compiled successfully."
+# ================= CHECK =================
 
-# ===================== PACKAGING =====================
-echo -e "\n📦 Packing kernel into flashable zip..."
-cp "$KERNEL_IMG" "$ANYKERNEL_DIR/zImage"
+IMG=$OUT_DIR/arch/arm64/boot/Image.gz-dtb
 
-cd $ANYKERNEL_DIR || exit 1
-zip -r9 "$ZIPNAME" * -x "*.zip" "*.git*" README.md > /dev/null
-
-if [ $? -eq 0 ]; then
-    echo -e "\n🎉 Flashable zip created: $ANYKERNEL_DIR/$ZIPNAME"
-    cp "$ANYKERNEL_DIR/$ZIPNAME" "$KERNEL_ROOT/"
-else
-    echo -e "\n❌ Failed to create zip."
+if [ ! -f "$IMG" ]; then
+    echo "❌ Build failed: Image not found"
     exit 1
 fi
 
-BUILD_END=$(date +%s)
-DIFF=$((BUILD_END - BUILD_START))
-echo -e "\n⏱️ Build completed in $((DIFF / 60))m $((DIFF % 60))s"
+echo "✅ Kernel compiled successfully"
 
-# ===================== TELEGRAM UPLOAD =====================
+# ================= VERIFY USER =================
+
+echo "🔍 Checking KBUILD..."
+strings $IMG | grep JOD || echo "⚠️ KBUILD not applied!"
+
+# ================= PACK =================
+
+echo "📦 Packing zip..."
+
+cp $IMG $ANYKERNEL_DIR/zImage
+
+cd $ANYKERNEL_DIR
+zip -r9 $ZIPNAME * -x "*.git*" "*.zip" > /dev/null
+
+cp $ZIPNAME $KERNEL_ROOT/
+
+echo "🎉 Zip created: $ZIPNAME"
+
+# ================= TELEGRAM UPLOAD =================
+
 if [ -n "$TELEGRAM_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ]; then
-    echo -e "\n📤 Uploading zip to Telegram..."
-    curl -s -F document=@"$ANYKERNEL_DIR/$ZIPNAME" \
+    echo "📤 Uploading to Telegram..."
+
+    curl -s -F document=@"$KERNEL_ROOT/$ZIPNAME" \
          -F chat_id="$TELEGRAM_CHAT_ID" \
-         -F caption="✅ Kernel Build Success
-📦 $ZIPNAME
-📱 $DEVICE
-🕐 $(date)" \
+         -F caption="✅ <b>Kernel Build Success</b>
+
+📦 <code>$ZIPNAME</code>
+📱 <code>$DEVICE</code>
+🧠 <code>BunnyX-PERF Kernel</code>
+👤 <code>JOD_BUNNY</code>
+🕐 <code>$(date)</code>" \
          -F parse_mode="HTML" \
-         "https://api.telegram.org/bot$TELEGRAM_TOKEN/sendDocument" > /dev/null
-    if [ $? -eq 0 ]; then
-        echo -e "\n✅ Uploaded to Telegram successfully!"
-    else
-        echo -e "\n❌ Telegram upload failed."
-    fi
+         "https://api.telegram.org/bot$TELEGRAM_TOKEN/sendDocument"
+
+    echo "✅ Uploaded to Telegram"
 else
-    echo -e "\n⚠️ Skipping Telegram upload — credentials not set."
+    echo "⚠️ Telegram not configured"
 fi
+
+echo "🏁 DONE"
