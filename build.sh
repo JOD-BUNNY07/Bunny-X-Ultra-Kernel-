@@ -15,7 +15,6 @@ ANYKERNEL_DIR=$KERNEL_ROOT/AnyKernel3
 OUT_DIR=$KERNEL_ROOT/out
 
 mkdir -p $HOME/toolchains
-mkdir -p $OUT_DIR
 
 # ============================================================
 # CLANG
@@ -84,14 +83,12 @@ export PATH=$CLANG_DIR/bin:$GCC_DIR/bin:$PATH
 export ARCH=arm64
 export SUBARCH=arm64
 export CLANG_TRIPLE=aarch64-linux-gnu-
-export CROSS_COMPILE=aarch64-linux-
+export CROSS_COMPILE=aarch64-linux-gnu-
 
-# 🔥 KBUILD INFO (IMPORTANT)
+# 🔥 KBUILD INFO
 export KBUILD_BUILD_USER="JOD_BUNNY"
 export KBUILD_BUILD_HOST="BUNNY-X"
 export KBUILD_BUILD_TIMESTAMP="$(date)"
-
-# 🔥 Kernel name inject
 export LOCALVERSION="-$KERNEL_NAME-$VARIANT"
 
 echo -e "\n👤 User: $KBUILD_BUILD_USER"
@@ -106,9 +103,10 @@ $CLANG_DIR/bin/clang --version | head -n 1
 
 echo -e "\n🧹 Cleaning..."
 
-make O=$OUT_DIR mrproper
 rm -rf $OUT_DIR
 mkdir -p $OUT_DIR
+
+make O=$OUT_DIR ARCH=arm64 mrproper
 
 # ============================================================
 # DEFCONFIG
@@ -117,9 +115,14 @@ mkdir -p $OUT_DIR
 echo -e "\n📄 Running defconfig..."
 
 make O=$OUT_DIR ARCH=arm64 atoll_defconfig
-
 make O=$OUT_DIR ARCH=arm64 olddefconfig
 make O=$OUT_DIR ARCH=arm64 prepare
+
+# ============================================================
+# BUILD START TIMER
+# ============================================================
+
+BUILD_START=$(date +%s)
 
 # ============================================================
 # BUILD
@@ -129,10 +132,10 @@ echo -e "\n🚀 Building kernel..."
 
 make -j$(nproc) O=$OUT_DIR \
   ARCH=arm64 \
-  LLVM=1 \
-  LLVM_IAS=1 \
   CC=clang \
   HOSTCC=clang \
+  LLVM=1 \
+  LLVM_IAS=1 \
   LD=ld.lld \
   AR=llvm-ar \
   NM=llvm-nm \
@@ -164,9 +167,9 @@ echo -e "\n✅ Build success"
 # VERIFY KBUILD
 # ============================================================
 
-echo -e "\n🔍 Checking KBUILD..."
+echo -e "\n🔍 Kernel banner:"
 
-strings $IMG | grep -E "JOD_BUNNY|BUNNY-X" || echo "⚠️ KBUILD not applied"
+strings $IMG | grep "Linux version"
 
 # ============================================================
 # PACKAGING
