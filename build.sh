@@ -10,7 +10,7 @@ set -o pipefail
 # Paths
 CLANG_DIR=$HOME/toolchains/clang
 GCC_DIR=$HOME/toolchains/gcc-aarch64-linux-gnu-9.3
-ANYKERNEL_DIR=$HOME/AnyKernel3
+ANYKERNEL_DIR=$KERNEL_ROOT/AnyKernel3
 OUT_DIR=$HOME/out
 
 mkdir -p $HOME/toolchains
@@ -120,6 +120,9 @@ make -j$JOBS O=$OUT_DIR \
     LLVM_IAS=1 \
     CLANG_TRIPLE=$CLANG_TRIPLE \
     CROSS_COMPILE=$CROSS_COMPILE \
+    KBUILD_BUILD_USER="JOD_BUNNY" \
+    KBUILD_BUILD_HOST="BUNNY-X" \
+    KBUILD_BUILD_TIMESTAMP="$BUILD_TIME" \
     2>&1 | tee $OUT_DIR/full_build.log | grep --line-buffered -E "warning:|error:" | sed \
     -e 's/warning:/\x1b[1;33mwarning:\x1b[0m/g' \
     -e 's/error:/\x1b[1;31merror:\x1b[0m/g'
@@ -141,6 +144,7 @@ zip -r9 "$ZIPNAME" * -x "*.zip" "*.git*" README.md > /dev/null
 
 if [ $? -eq 0 ]; then
     echo -e "\n🎉 Flashable zip created: $ANYKERNEL_DIR/$ZIPNAME"
+    cp "$ANYKERNEL_DIR/$ZIPNAME" "$KERNEL_ROOT/"
 else
     echo -e "\n❌ Failed to create zip."
     exit 1
