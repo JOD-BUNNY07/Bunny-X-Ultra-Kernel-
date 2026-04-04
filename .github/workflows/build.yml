@@ -54,7 +54,8 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: BunnyX-Kernel
+          name: NitroX-Zenith-Ksu-Kernel
           path: |
-            AnyKernel3/*.zip
-            out/arch/arm64/boot/Image*
+             *.zip
+             AnyKernel3/*.zip
+             out/arch/arm64/boot/Image*
