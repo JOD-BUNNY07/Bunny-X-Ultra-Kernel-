@@ -21,13 +21,11 @@ mkdir -p $HOME/toolchains
 mkdir -p $OUT_DIR
 
 # =========================
-# CLANG 17
+# CLANG (FIXED)
 # =========================
 if [ ! -d "$CLANG_DIR" ]; then
-    echo "🔍 Cloning Clang 17..."
+    echo "🔍 Cloning Clang..."
     git clone --depth=1 https://github.com/ZyCromerZ/Clang.git "$CLANG_DIR"
-else
-    echo "✅ Clang already present"
 fi
 
 # =========================
@@ -39,7 +37,7 @@ if [ ! -d "$GCC64_DIR" ]; then
 fi
 
 # =========================
-# GCC 32 (IMPORTANT)
+# GCC 32
 # =========================
 if [ ! -d "$GCC32_DIR" ]; then
     echo "🔍 Cloning GCC32..."
@@ -55,24 +53,28 @@ if [ ! -d "$ANYKERNEL_DIR" ]; then
 fi
 
 # =========================
-# EXPORT PATH (CRITICAL FIX)
+# FIX CLANG DETECTION
+# =========================
+CLANG_BIN=$(find $CLANG_DIR/bin -name "clang" | head -n 1)
+
+if [ -z "$CLANG_BIN" ]; then
+    echo "❌ Clang not found!"
+    exit 1
+fi
+
+# =========================
+# EXPORT ENV
 # =========================
 export PATH=$CLANG_DIR/bin:$GCC64_DIR/bin:$GCC32_DIR/bin:$PATH
 
-# Verify clang
-echo "🔧 Using Clang:"
-$CLANG_DIR/bin/clang --version | head -n 1
-
-# =========================
-# ENVIRONMENT
-# =========================
 export ARCH=arm64
 export SUBARCH=arm64
 
-export CC=clang
+export CC=$CLANG_BIN
 export CROSS_COMPILE=aarch64-linux-gnu-
 export CROSS_COMPILE_ARM32=arm-linux-gnueabi-
 export CLANG_TRIPLE=aarch64-linux-gnu-
+export LD=ld.lld
 
 # =========================
 # KERNEL INFO
@@ -87,7 +89,9 @@ export LOCALVERSION="-$KERNEL_NAME-$VARIANT-$DEVICE-$VERSION_NO"
 export KBUILD_BUILD_USER="JOD_BUNNY"
 export KBUILD_BUILD_HOST="BUNNY-X"
 export KBUILD_BUILD_TIMESTAMP="$(date)"
-export KBUILD_COMPILER_STRING="$($CLANG_DIR/bin/clang --version | head -n 1)"
+
+echo "🔧 Using Clang:"
+$CC --version | head -n 1
 
 echo "📱 Device: $DEVICE"
 echo "🧠 Kernel: $KERNEL_NAME ($VARIANT)"
@@ -98,7 +102,6 @@ echo "🧠 Kernel: $KERNEL_NAME ($VARIANT)"
 echo "🧹 Cleaning..."
 rm -rf $OUT_DIR
 mkdir -p $OUT_DIR
-ccache -C || true
 
 # =========================
 # DEFCONFIG
@@ -116,10 +119,10 @@ echo "🚀 Building kernel..."
 
 make -j$(nproc) O=$OUT_DIR \
     ARCH=arm64 \
-    CC=clang \
+    CC=$CC \
     LLVM=1 \
     LLVM_IAS=1 \
-    LD=$CLANG_DIR/bin/ld.lld \
+    LD=ld.lld \
     CROSS_COMPILE=$CROSS_COMPILE \
     CROSS_COMPILE_ARM32=$CROSS_COMPILE_ARM32 \
     CLANG_TRIPLE=$CLANG_TRIPLE \
@@ -165,24 +168,22 @@ cp $ZIPNAME $KERNEL_ROOT/
 echo "🎉 Zip created: $ZIPNAME"
 
 # =========================
-# TELEGRAM UPLOAD
+# TELEGRAM
 # =========================
 if [ -n "$TELEGRAM_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ]; then
     echo "📤 Uploading to Telegram..."
 
     curl -s -F document=@"$KERNEL_ROOT/$ZIPNAME" \
          -F chat_id="$TELEGRAM_CHAT_ID" \
-         -F caption="✅ <b>NitroX-Zenith Kernel Build</b>
+         -F caption="✅ NitroX-Zenith Kernel Build
 
-📦 <code>$ZIPNAME</code>
-📱 <code>$DEVICE</code>
-⚙️ <code>$VARIANT</code>
-🧠 <code>$KERNEL_NAME</code>
-🕐 <code>$(date)</code>" \
-         -F parse_mode="HTML" \
+📦 $ZIPNAME
+📱 $DEVICE
+⚙️ $VARIANT
+🕐 $(date)" \
          https://api.telegram.org/bot$TELEGRAM_TOKEN/sendDocument > /dev/null
 
-    echo "✅ Uploaded to Telegram"
+    echo "✅ Uploaded"
 else
     echo "⚠️ Telegram skipped"
 fi
