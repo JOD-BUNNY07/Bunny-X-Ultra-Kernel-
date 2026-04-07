@@ -1,4 +1,4 @@
-name: NitroX - Zenith (KSUN) Kernel Build
+name: NitroX-Zenith Kernel Build
 
 on:
   push:
@@ -30,22 +30,23 @@ jobs:
       - name: 🧰 Install Dependencies
         run: |
           sudo apt update
-          sudo apt install -y \
-            git curl zip bc bison flex \
-            libssl-dev libelf-dev \
-            ccache build-essential python3
+          sudo apt install -y git curl zip bc bison flex \
+          libssl-dev libelf-dev ccache build-essential python3
 
       - name: 🛠 Make Build Script Executable
         run: chmod +x build.sh
 
-      - name: 🕒 Set Build Timestamp
-        run: echo "BUILD_TIME=$(date -u)" >> $GITHUB_ENV
+      - name: 🕒 Set KBUILD Variables
+        run: |
+          echo "KBUILD_BUILD_USER=JOD_BUNNY" >> $GITHUB_ENV
+          echo "KBUILD_BUILD_HOST=BUNNY-X" >> $GITHUB_ENV
+          echo "KBUILD_BUILD_TIMESTAMP=$(date -u +%Y%m%d-%H%M%S)" >> $GITHUB_ENV
 
-      - name: 🚀 Run Kernel Build
+      - name: 🚀 Build Kernel
         env:
-          KBUILD_BUILD_USER: JOD_BUNNY
-          KBUILD_BUILD_HOST: BUNNY-X
-          KBUILD_BUILD_TIMESTAMP: ${{ env.BUILD_TIME }}
+          KBUILD_BUILD_USER: ${{ env.KBUILD_BUILD_USER }}
+          KBUILD_BUILD_HOST: ${{ env.KBUILD_BUILD_HOST }}
+          KBUILD_BUILD_TIMESTAMP: ${{ env.KBUILD_BUILD_TIMESTAMP }}
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: ./build.sh
@@ -54,7 +55,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: NitroX-Zenith-Ksu-Kernel
+          name: NitroX-Zenith-KSU-Kernel
           path: |
              *.zip
              AnyKernel3/*.zip
