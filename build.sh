@@ -33,15 +33,18 @@ export KBUILD_BUILD_HOST="BUNNY-X"
 export KBUILD_BUILD_TIMESTAMP="$(date)"
 
 # ---------------------------
-# 🛠 FIX: Force Patch Build Scripts (The Ultimate Fix)
+# 🛠 THE ULTIMATE FIX: Hard-patching compilation scripts
 # ---------------------------
-echo -e "\n🛠 Patching compilation scripts to force User/Host..."
+echo -e "\n🛠 Applying hard-patch to scripts/mkcompile_h..."
+# অনেক সোর্সে whoami এবং hostname ব্যাকটিক্স বা ডলার ফরম্যাটে থাকে, সবগুলোকে আমরা আপনার নাম দিয়ে রিপ্লেস করছি
 if [ -f "scripts/mkcompile_h" ]; then
-    # কার্নেলের ইন্টারনাল স্ক্রিপ্টকে বাধ্য করা হচ্ছে যাতে সে সিস্টেমের বদলে আপনার নাম ব্যবহার করে
     sed -i "s/\`whoami\`/echo $KBUILD_BUILD_USER/g" scripts/mkcompile_h
     sed -i "s/\`hostname\`/echo $KBUILD_BUILD_HOST/g" scripts/mkcompile_h
     sed -i "s/\$(whoami)/$KBUILD_BUILD_USER/g" scripts/mkcompile_h
     sed -i "s/\$(hostname)/$KBUILD_BUILD_HOST/g" scripts/mkcompile_h
+    # সরাসরি ইকো কমান্ডগুলোকেও বদলে দেওয়া হচ্ছে
+    sed -i "s/echo \$USER/echo $KBUILD_BUILD_USER/g" scripts/mkcompile_h
+    sed -i "s/echo \$HOSTNAME/echo $KBUILD_BUILD_HOST/g" scripts/mkcompile_h
 fi
 
 # ---------------------------
@@ -53,13 +56,13 @@ export SUBARCH=arm64
 export CLANG_TRIPLE=aarch64-linux-gnu-
 export CROSS_COMPILE=aarch64-linux-
 
-echo -e "\n🧹 Cleaning out directory..."
+echo -e "\n🧹 Wiping out directory..."
 rm -rf $OUT_DIR && mkdir -p $OUT_DIR
 
 echo -e "\n📄 Generating Defconfig..."
 make O=$OUT_DIR ARCH=arm64 atoll_defconfig
 
-# 🛠 Force apply KBUILD into .config to avoid overrides
+# 🛠 Force-injecting KBUILD into the final .config
 echo "CONFIG_KBUILD_BUILD_USER=\"$KBUILD_BUILD_USER\"" >> $OUT_DIR/.config
 echo "CONFIG_KBUILD_BUILD_HOST=\"$KBUILD_BUILD_HOST\"" >> $OUT_DIR/.config
 echo "CONFIG_LOCALVERSION_AUTO=n" >> $OUT_DIR/.config
@@ -77,34 +80,34 @@ make -j$(nproc) O=$OUT_DIR \
 # ---------------------------
 # Verification & Packing
 # ---------------------------
+# ইমেজ ভেরিফিকেশন যদি ফেইলও করে, তবুও জিপ ফাইল তৈরি হবে
 RAW_IMG=$OUT_DIR/arch/arm64/boot/Image
 IMG=$OUT_DIR/arch/arm64/boot/Image.gz-dtb
 
 if [ ! -f "$IMG" ]; then
-    echo -e "\n❌ Build failed! Check the log."
+    echo -e "\n❌ Build failed! Please check the build.log above."
     exit 1
 fi
 
-# 🔍 Final KBUILD check
-echo -e "\n🔍 Verifying KBUILD info in Image..."
+echo -e "\n🔍 Final Verification..."
+# এবার strings কমান্ড দিয়ে আপনার নাম খোঁজা হচ্ছে
 if strings $RAW_IMG | grep -E -i "$KBUILD_BUILD_USER|$KBUILD_BUILD_HOST"; then
-    echo "✅ SUCCESS: KBUILD Info Applied!"
+    echo "✅ KBUILD INFO VERIFIED!"
 else
-    echo "⚠️ Warning: Strings check failed, but proceeding to pack."
+    echo "⚠️ Strings not found in raw image, but force finishing packing."
 fi
 
 cp $IMG $ANYKERNEL_DIR/zImage
 cd $ANYKERNEL_DIR
-DATE=$(date +%Y%m%d-%H%M)
-ZIPNAME="${KERNEL_NAME}-${VERSION}-RMX2061-${DATE}.zip"
+ZIPNAME="${KERNEL_NAME}-${VERSION}-RMX2061-$(date +%H%M).zip"
 zip -r9 $ZIPNAME * -x "*.git*" "*.zip" README.md
 cp $ZIPNAME $KERNEL_ROOT/
 
 # ---------------------------
-# 📤 Telegram Upload with Info
+# 📤 Telegram Upload
 # ---------------------------
 if [[ -n "$TELEGRAM_TOKEN" ]]; then
-    CAPTION="✅ **Kernel Build Success!**
+    CAPTION="✅ **Build Successful!**
 
 📝 **Kernel Name:** $KERNEL_NAME
 📱 **Device:** $DEVICE
