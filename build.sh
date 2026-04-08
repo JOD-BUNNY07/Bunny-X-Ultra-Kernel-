@@ -22,28 +22,35 @@ chmod -R +x $ANYKERNEL_DIR
 mkdir -p $OUT_DIR
 
 # ---------------------------
-# Build Info
+# Build Info (Static Hardcoding)
 # ---------------------------
 export KBUILD_BUILD_USER="JOD_BUNNY"
 export KBUILD_BUILD_HOST="BUNNY-X"
 export KBUILD_BUILD_TIMESTAMP="$(date)"
 
 # ---------------------------
-# 🛠 1. Defconfig Cleanup (The Fix for 'unexpected data')
+# 🛠 FIX 1: Defconfig Cleanup (The '+' and '-' problem)
 # ---------------------------
-echo -e "\n🧹 Fixing defconfig formatting..."
+echo -e "\n🧹 Cleaning up defconfig artifacts..."
 DEFCONFIG="arch/arm64/configs/atoll_defconfig"
-# লাইনের শুরুতে থাকা '+' এবং '-' চিহ্ন সরিয়ে ফেলা হচ্ছে
+# ডিফকনফিগ ফাইলের লাইন থেকে '+' বা '-' সরিয়ে ফেলা হচ্ছে (unexpected data fix)
 sed -i 's/^[+-]//g' "$DEFCONFIG"
 sed -i 's/^[ \t]*//' "$DEFCONFIG"
 
 # ---------------------------
-# 🛠 2. Hard-Fix Makefile (The Fix for KBUILD not applying)
+# 🛠 FIX 2: Force Patch mkcompile_h (Ultimate KBUILD Fix)
 # ---------------------------
-echo -e "\n🛠 Patching Makefile variables..."
-# সরাসরি Makefile-এ থাকা ডিফল্ট ভেরিয়েবলগুলোকে রিপ্লেস করা
-sed -i "s/KBUILD_BUILD_USER :=.*/KBUILD_BUILD_USER := $KBUILD_BUILD_USER/g" Makefile
-sed -i "s/KBUILD_BUILD_HOST :=.*/KBUILD_BUILD_HOST := $KBUILD_BUILD_HOST/g" Makefile
+echo -e "\n🛠 Patching compilation scripts to force User/Host..."
+# এই কমান্ডটি সরাসরি কার্নেলের বিল্ড স্ক্রিপ্টে আপনার নাম লিখে দিবে যাতে কেউ ওভাররাইট করতে না পারে
+sed -i "s/whoami/echo $KBUILD_BUILD_USER/g" scripts/mkcompile_h
+sed -i "s/hostname/echo $KBUILD_BUILD_HOST/g" scripts/mkcompile_h
+
+# ---------------------------
+# 🛠 FIX 3: Patching Makefile
+# ---------------------------
+echo -e "\n🛠 Hard-coding KBUILD info into Makefile..."
+sed -i "s/^KBUILD_BUILD_USER :=.*/KBUILD_BUILD_USER := $KBUILD_BUILD_USER/g" Makefile
+sed -i "s/^KBUILD_BUILD_HOST :=.*/KBUILD_BUILD_HOST := $KBUILD_BUILD_HOST/g" Makefile
 
 # ---------------------------
 # Build Environment
@@ -54,7 +61,7 @@ export SUBARCH=arm64
 export CLANG_TRIPLE=aarch64-linux-gnu-
 export CROSS_COMPILE=aarch64-linux-
 
-echo -e "\n🧹 Cleaning..."
+echo -e "\n🧹 Cleaning out directory..."
 rm -rf $OUT_DIR && mkdir -p $OUT_DIR
 
 echo -e "\n📄 Generating Defconfig..."
@@ -76,7 +83,7 @@ make -j$(nproc) O=$OUT_DIR \
   KCFLAGS="-Wno-error" 2>&1 | tee $OUT_DIR/build.log
 
 # ---------------------------
-# Verification
+# Verification & Packing
 # ---------------------------
 RAW_IMG=$OUT_DIR/arch/arm64/boot/Image
 IMG=$OUT_DIR/arch/arm64/boot/Image.gz-dtb
@@ -86,25 +93,22 @@ if [ ! -f "$IMG" ]; then
     exit 1
 fi
 
-echo -e "\n🔍 Checking KBUILD again..."
-# এবার strings ইমেজ ফাইলের ভেতর আপনার দেওয়া নাম খোঁজার চেষ্টা করবে
+echo -e "\n🔍 Verifying KBUILD..."
+# এবার strings কমান্ড দিয়ে আপনার নাম খোঁজা হচ্ছে
 if strings $RAW_IMG | grep -E -i "$KBUILD_BUILD_USER|$KBUILD_BUILD_HOST"; then
-    echo "✅ KBUILD APPLIED!"
+    echo "✅ KBUILD APPLIED SUCCESSFULLY!"
 else
-    echo "❌ KBUILD still not found in strings, but zip is being created."
+    echo "⚠️ Strings check failed on raw image, but force finishing."
 fi
 
-# ---------------------------
-# Packing
-# ---------------------------
 cp $IMG $ANYKERNEL_DIR/zImage
 cd $ANYKERNEL_DIR
-ZIPNAME="NitroX-Zenith-RMX2061-$(date +%H%M).zip"
+ZIPNAME="NitroX-Zenith-RMX2061-$(date +%H%M-%d%m).zip"
 zip -r9 $ZIPNAME * -x "*.git*" "*.zip" README.md
 cp $ZIPNAME $KERNEL_ROOT/
 
 if [[ -n "$TELEGRAM_TOKEN" ]]; then
     curl -s -F document=@"$KERNEL_ROOT/$ZIPNAME" -F chat_id="$TELEGRAM_CHAT_ID" \
-         -F caption="✅ Build Finished! User: $KBUILD_BUILD_USER" \
+         -F caption="✅ Build Success! | User: $KBUILD_BUILD_USER" \
          https://api.telegram.org/bot$TELEGRAM_TOKEN/sendDocument > /dev/null
 fi
