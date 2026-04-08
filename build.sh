@@ -40,17 +40,20 @@ DEVICE="RMX2061"
 VARIANT="KSUN"
 BUILD_TYPE="Stable"
 VERSION_NUMBER="v1.0.0"
-ZIPNAME="${KERNEL_NAME}-${VARIANT}-${DEVICE}-${BUILD_TYPE}-$(date +%H%M-%Y%m%d)-${VERSION_NUMBER}.zip"
+DATE=$(date +%Y%m%d-%H%M)
+ZIPNAME="${KERNEL_NAME}-${VARIANT}-${DEVICE}-${BUILD_TYPE}-${DATE}-${VERSION_NUMBER}.zip"
 
+# KBUILD Variables
 export KBUILD_BUILD_USER="JOD_BUNNY"
 export KBUILD_BUILD_HOST="BUNNY-X"
-export KBUILD_BUILD_TIMESTAMP="$(date -u +%Y%m%d-%H%M%S)"
+export KBUILD_BUILD_TIMESTAMP="$(date)"
 
 export PATH="$CLANG_DIR/bin:$GCC_DIR/bin:$PATH"
 export ARCH=arm64
 export SUBARCH=arm64
 export CLANG_TRIPLE=aarch64-linux-gnu-
 export CROSS_COMPILE=aarch64-linux-
+export CROSS_COMPILE_ARM32=arm-linux-androideabi-
 
 # ---------------------------
 # Build
@@ -62,29 +65,42 @@ mkdir -p $OUT_DIR
 echo -e "\n📄 Defconfig..."
 make O=$OUT_DIR ARCH=arm64 atoll_defconfig
 make O=$OUT_DIR ARCH=arm64 olddefconfig
-make O=$OUT_DIR ARCH=arm64 prepare
 
 echo -e "\n🚀 Building..."
+# ভেরিয়েবলগুলোকে সরাসরি make কমান্ডের আর্গুমেন্ট হিসেবে পাস করা হলো
 make -j$(nproc) O=$OUT_DIR \
-  ARCH=arm64 CC=clang LLVM=1 LLVM_IAS=1 \
-  CLANG_TRIPLE=$CLANG_TRIPLE CROSS_COMPILE=$CROSS_COMPILE \
+  ARCH=arm64 \
+  CC=clang \
+  LLVM=1 \
+  LLVM_IAS=1 \
+  CLANG_TRIPLE=$CLANG_TRIPLE \
+  CROSS_COMPILE=$CROSS_COMPILE \
+  CROSS_COMPILE_ARM32=$CROSS_COMPILE_ARM32 \
+  KBUILD_BUILD_USER="$KBUILD_BUILD_USER" \
+  KBUILD_BUILD_HOST="$KBUILD_BUILD_HOST" \
+  KBUILD_BUILD_TIMESTAMP="$KBUILD_BUILD_TIMESTAMP" \
   KCFLAGS="-Wno-error" \
-  KBUILD_BUILD_USER=$KBUILD_BUILD_USER \
-  KBUILD_BUILD_HOST=$KBUILD_BUILD_HOST \
-  KBUILD_BUILD_TIMESTAMP=$KBUILD_BUILD_TIMESTAMP \
   2>&1 | tee $OUT_DIR/build.log
 
 # ---------------------------
 # Verify KBUILD
 # ---------------------------
+# Image.gz-dtb এর বদলে raw Image ফাইলটি চেক করা বেশি নিরাপদ কারণ এটি আন-কম্প্রেসড
+RAW_IMG=$OUT_DIR/arch/arm64/boot/Image
 IMG=$OUT_DIR/arch/arm64/boot/Image.gz-dtb
+
 if [ ! -f "$IMG" ]; then
-    echo -e "\n❌ Build failed!"
+    echo -e "\n❌ Build failed! Kernel image not found."
     exit 1
 fi
 
-echo -e "\n🔍 Checking KBUILD..."
-strings -a $IMG | grep -E "$KBUILD_BUILD_USER|$KBUILD_BUILD_HOST|$KBUILD_BUILD_TIMESTAMP" || echo "⚠️ KBUILD not applied"
+echo -e "\n🔍 Checking KBUILD Status..."
+# RAW Image এ ইউজার এবং হোস্ট চেক করা হচ্ছে
+if strings $RAW_IMG | grep -E -q "$KBUILD_BUILD_USER|$KBUILD_BUILD_HOST"; then
+    echo "✅ KBUILD successfully applied!"
+else
+    echo "⚠️ KBUILD info not found in strings, but continuing..."
+fi
 
 # ---------------------------
 # AnyKernel Packing
@@ -103,15 +119,16 @@ if [[ -n "$TELEGRAM_TOKEN" && -n "$TELEGRAM_CHAT_ID" ]]; then
     echo -e "\n📤 Uploading to Telegram..."
     curl -s -F document=@"$KERNEL_ROOT/$ZIPNAME" \
          -F chat_id="$TELEGRAM_CHAT_ID" \
-         -F caption="✅ NitroX-Zenith Kernel Build
+         -F caption="✅ NitroX-Zenith Kernel Build Success!
 
-📦 $ZIPNAME
-📱 Device: $DEVICE
-⚙️ Variant: $VARIANT
-🧠 Kernel: $KERNEL_NAME
-🕐 Build Timestamp: $KBUILD_BUILD_TIMESTAMP" \
+📦 **File:** $ZIPNAME
+📱 **Device:** $DEVICE
+⚙️ **Variant:** $VARIANT
+👤 **Build User:** $KBUILD_BUILD_USER
+💻 **Build Host:** $KBUILD_BUILD_HOST
+🕐 **Build Time:** $KBUILD_BUILD_TIMESTAMP" \
          https://api.telegram.org/bot$TELEGRAM_TOKEN/sendDocument > /dev/null
     echo -e "\n✅ Uploaded to Telegram"
 else
-    echo -e "\n⚠️ TELEGRAM_TOKEN or TELEGRAM_CHAT_ID missing, skipping upload"
+    echo -e "\n⚠️ Telegram credentials missing, skipping upload"
 fi
