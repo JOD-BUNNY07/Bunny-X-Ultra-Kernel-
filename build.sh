@@ -22,31 +22,31 @@ chmod -R +x $ANYKERNEL_DIR
 mkdir -p $OUT_DIR
 
 # ---------------------------
-# Build Info (Static Hardcoding)
+# Build Info
 # ---------------------------
 export KBUILD_BUILD_USER="JOD_BUNNY"
 export KBUILD_BUILD_HOST="BUNNY-X"
 export KBUILD_BUILD_TIMESTAMP="$(date)"
 
 # ---------------------------
-# 🛠 FIX 1: Defconfig Cleanup (The '+' and '-' problem)
+# 🛠 FIX 1: Defconfig Cleanup (Removing garbage '+', '-' and spaces)
 # ---------------------------
 echo -e "\n🧹 Cleaning up defconfig artifacts..."
 DEFCONFIG="arch/arm64/configs/atoll_defconfig"
-# ডিফকনফিগ ফাইলের লাইন থেকে '+' বা '-' সরিয়ে ফেলা হচ্ছে (unexpected data fix)
+# ডিফকনফিগে থাকা ভুল ফরম্যাটের প্লাস/মাইনাস চিহ্নগুলো মুছে ফেলা হচ্ছে
 sed -i 's/^[+-]//g' "$DEFCONFIG"
 sed -i 's/^[ \t]*//' "$DEFCONFIG"
 
 # ---------------------------
-# 🛠 FIX 2: Force Patch mkcompile_h (Ultimate KBUILD Fix)
+# 🛠 FIX 2: Patch mkcompile_h (Force hardcode User/Host)
 # ---------------------------
-echo -e "\n🛠 Patching compilation scripts to force User/Host..."
-# এই কমান্ডটি সরাসরি কার্নেলের বিল্ড স্ক্রিপ্টে আপনার নাম লিখে দিবে যাতে কেউ ওভাররাইট করতে না পারে
-sed -i "s/whoami/echo $KBUILD_BUILD_USER/g" scripts/mkcompile_h
-sed -i "s/hostname/echo $KBUILD_BUILD_HOST/g" scripts/mkcompile_h
+echo -e "\n🛠 Patching compilation scripts..."
+# কার্নেলের ইন্টারনাল স্ক্রিপ্টকে বাধ্য করা হচ্ছে যাতে সে সরাসরি আপনার নাম ব্যবহার করে
+sed -i "s/\`whoami\`/$KBUILD_BUILD_USER/g" scripts/mkcompile_h
+sed -i "s/\`hostname\`/$KBUILD_BUILD_HOST/g" scripts/mkcompile_h
 
 # ---------------------------
-# 🛠 FIX 3: Patching Makefile
+# 🛠 FIX 3: Makefile Patching
 # ---------------------------
 echo -e "\n🛠 Hard-coding KBUILD info into Makefile..."
 sed -i "s/^KBUILD_BUILD_USER :=.*/KBUILD_BUILD_USER := $KBUILD_BUILD_USER/g" Makefile
@@ -74,7 +74,7 @@ echo "CONFIG_LOCALVERSION_AUTO=n" >> $OUT_DIR/.config
 
 make O=$OUT_DIR ARCH=arm64 olddefconfig
 
-echo -e "\n🚀 Starting Build..."
+echo -e "\n🚀 Starting Kernel Build..."
 make -j$(nproc) O=$OUT_DIR \
   ARCH=arm64 CC=clang LLVM=1 LLVM_IAS=1 \
   CLANG_TRIPLE=$CLANG_TRIPLE CROSS_COMPILE=$CROSS_COMPILE \
@@ -83,7 +83,7 @@ make -j$(nproc) O=$OUT_DIR \
   KCFLAGS="-Wno-error" 2>&1 | tee $OUT_DIR/build.log
 
 # ---------------------------
-# Verification & Packing
+# Verification
 # ---------------------------
 RAW_IMG=$OUT_DIR/arch/arm64/boot/Image
 IMG=$OUT_DIR/arch/arm64/boot/Image.gz-dtb
@@ -94,13 +94,16 @@ if [ ! -f "$IMG" ]; then
 fi
 
 echo -e "\n🔍 Verifying KBUILD..."
-# এবার strings কমান্ড দিয়ে আপনার নাম খোঁজা হচ্ছে
+# ইমেজ ফাইলের স্ট্রিংস চেক করা হচ্ছে আপনার নামের জন্য
 if strings $RAW_IMG | grep -E -i "$KBUILD_BUILD_USER|$KBUILD_BUILD_HOST"; then
-    echo "✅ KBUILD APPLIED SUCCESSFULLY!"
+    echo "✅ KBUILD APPLIED PERFECTLY!"
 else
-    echo "⚠️ Strings check failed on raw image, but force finishing."
+    echo "⚠️ Strings check failed on raw image, but proceed to packing."
 fi
 
+# ---------------------------
+# Packing
+# ---------------------------
 cp $IMG $ANYKERNEL_DIR/zImage
 cd $ANYKERNEL_DIR
 ZIPNAME="NitroX-Zenith-RMX2061-$(date +%H%M-%d%m).zip"
@@ -109,6 +112,6 @@ cp $ZIPNAME $KERNEL_ROOT/
 
 if [[ -n "$TELEGRAM_TOKEN" ]]; then
     curl -s -F document=@"$KERNEL_ROOT/$ZIPNAME" -F chat_id="$TELEGRAM_CHAT_ID" \
-         -F caption="✅ Build Success! | User: $KBUILD_BUILD_USER" \
+         -F caption="✅ Build Success! | User: $KBUILD_BUILD_USER | Host: $KBUILD_BUILD_HOST" \
          https://api.telegram.org/bot$TELEGRAM_TOKEN/sendDocument > /dev/null
 fi
