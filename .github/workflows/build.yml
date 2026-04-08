@@ -39,6 +39,11 @@ jobs:
       - name: 🕒 Set Build Timestamp
         run: echo "BUILD_TIME=$(date -u +%Y%m%d-%H%M%S)" >> $GITHUB_ENV
 
+      - name: 🕒 Set Build Timestamp
+        run: |
+          # সাধারণ রিডেবল টাইম ফরম্যাট যা কার্নেল সহজে গ্রহণ করে
+          echo "BUILD_TIME=$(date -u +'%b %d %Y %H:%M:%S')" >> $GITHUB_ENV
+
       - name: 🚀 Run Kernel Build
         env:
           KBUILD_BUILD_USER: JOD_BUNNY
@@ -47,6 +52,7 @@ jobs:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: ./build.sh
+        
 
       - name: 📦 Upload Build Artifact
         if: success()
